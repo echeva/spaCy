@@ -80,5 +80,6 @@ def processing(nlp, text):
 nlp = spacy.load("es_core_news_sm")
 result_1 = processing(nlp, text_1)
 result_2 = processing(nlp, text_2)
-print(result_1)
-print(result_2)
+print(f"Archivo 1: {result_1}")
+print(f"Archivo 2: {result_2}")
+
