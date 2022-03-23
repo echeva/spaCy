@@ -1,38 +1,76 @@
 import spacy
 from spacy.matcher import Matcher
+from doc2 import text
 
-# Load a pipeline and create the nlp object
-nlp = spacy.load("es_dep_news_trf")
-matcher = Matcher(nlp.vocab)
-
-pattern = [{"IS_DIGIT": True},
-           {"LOWER": "mm"},
-           {"IS_DIGIT": True}]
-
-matcher.add("SIZE_PATTERN", [pattern])
-
-text = "F. último doc.: 27/04/2020 08:08   SERVICIO DE ANATOMÍA PATOLÓGICA COORDINACIO ONCOLOGICA ONC ONCOLOGIA MEDIC " \
-       "B20-321815 Estudio: Centro: DEFINITIVO" \
-       "Se procede con los estudios moleculares Idylla EGFR, nCounter de pulmón y tinción por " \
-       "inmunohistoquímica de PD-L1 con el clon 22C3, de cuyo resultado se emitirá un informe complementario." \
-       "DESCRIPCIÓN MACROSCOPICA" \
-       "DETERMINACIÓ MOLECULAR" \
-       "Motivo: Determinación Molecular Correspondientes a: ONCOMINE, NANOSTRING. La muestra contiene un 70% de celularidad tumoral (tamaño 70mm2)." \
-       "- Diagnóstico histológico: " \
-       "neo de pulmón- Análisis solicitado:" \
-       "oncomine 22- Muestra recibida y analizada:" \
-       "B20-321815 que corresponde a bloque de archivo  B20-321815-A5- Porcentaje aproximado de células tumorales en muestras analizada:" \
-       "70%- Área aproximada de tejido analizada: 70mm2- Método: Extracción de ADN genómico del tumor." \
-       "Análisis mediante la ultrasecuenciación de un panel que analiza 22 genes. El panel analizado es el Oncomine Solid Tumour DNA de Applied que analiza mutaciones en los siguientes genes:" \
-       "AKT1, ALK, BRAF, CTNNB1, DDR2, EGFR, ERBB2, ERBB4, FBXW7, FGFR1, FGFR2, FGFR3, KRAS, MAP2K1, MET, NOTCH1, NRAS, PIK3CA, PTEN, SMAD4, STK11 y TP53" \
-       "- RESULTADO" \
-       "1. Genes MutadosCTNNB1 mutación exón 3; c.110C>T; p.(Ser37Phe)/p.(S37F); fecuencia aproximada alelo mutado 31% TP53 mutación exón 6; c.580C>T; p.(Leu194Phe)/p.(L194F); frecuencia aproximada alelo mutado 20%" \
-       "2. Resto de genes: No Mutados "
-
+nlp = spacy.load("es_core_news_sm")
 doc = nlp(text)
-matches = matcher(doc)
 
-for match_id, start, end in matches:
-    # Get the matched span
-    matched_span = doc[start:end]
-    print(matched_span.text)
+result = {}
+
+
+def alias(matcher, doc):
+    pattern = [{"POS": "PROPN", "LENGTH": {"==": 10}, "TEXT": {"REGEX": 'B\d{2}-\d{6}'}}]
+    matcher.add("ALIAS_PATTERN", [pattern])
+    matches = matcher(doc)
+    for match_id, start, end in matches:
+        result["alias"] = doc[start:end]
+
+
+def entry_date(matcher, doc):
+    for token in doc:
+        if token.pos_ == "NUM":
+            if "/" in token.text and len(token.text) == 10:
+                result["entry-date"] = token.text
+
+
+def size(matcher, doc):
+    pattern = [{"POS": "NUM", "TEXT": {"REGEX": '\d{1,}mm2'}}]
+    matcher.add("SIZE_PATTERN", [pattern])
+    matches = matcher(doc)
+    for match_id, start, end in matches:
+        result["size"] = doc[start:end]
+
+
+def ngs_biomarker(matcher, doc):
+    result["ngs-biomarker"] = ''
+
+
+def ngs_kit(matcher, doc):
+    pattern = [{"LOWER": "oncomine"}, {"TEXT": {"REGEX": '\d{1,}'}}]
+    # pattern = [{"LOWER": "oncomine", "POS": "VERB"}, {"TEXT": {"REGEX": '\d{1,}'}}]
+    matcher.add("NGS_KIT_PATTERN", [pattern])
+    matches = matcher(doc)
+    for match_id, start, end in matches:
+        result["ngs-kit"] = doc[start:end]
+
+
+def ngs_dna_alteration(matcher, doc):
+    result["ngs-dna-alteration"] = ''
+
+
+def ngs_position_alteration(matcher, doc):
+    result["ngs-position-alteration"] = ''
+
+
+def ngs_allelic_frequency(matcher, doc):
+    pattern = [{"POS": "SYM"}]
+    matcher.add("NGS_ALLELIC_FREQUENCY_PATTERN", [pattern])
+    matches = matcher(doc)
+    for match_id, start, end in matches:
+        result["ngs-allelic-frequency"] = doc[start:end]
+
+
+for token in doc:
+    print(token.text, token.pos_)
+
+alias(Matcher(nlp.vocab), doc)
+entry_date(Matcher(nlp.vocab), doc)
+size(Matcher(nlp.vocab), doc)
+ngs_biomarker(Matcher(nlp.vocab), doc)
+ngs_kit(Matcher(nlp.vocab), doc)
+ngs_dna_alteration(Matcher(nlp.vocab), doc)
+ngs_position_alteration(Matcher(nlp.vocab), doc)
+ngs_allelic_frequency(Matcher(nlp.vocab), doc)
+
+
+print(result)
